@@ -7,8 +7,7 @@ import {
   PLAYER_RADIUS,
 } from '../../shared/combat.ts';
 import type { PhysicsWorld } from '../physics/PhysicsWorld.ts';
-import { createCharacterFace } from './createCharacterFace.ts';
-import { createCharacterWeapon } from './createCharacterWeapon.ts';
+import { createCharacterBody } from './createCharacterBody.ts';
 
 export class Player {
   readonly mesh: THREE.Group;
@@ -26,37 +25,22 @@ export class Player {
   private readonly visual: THREE.Mesh;
   private readonly material: THREE.MeshStandardMaterial;
   private readonly weapon: THREE.Group;
+  private readonly animateCharacter: (delta: number, speed: number) => void;
+  private previousPosition = new THREE.Vector3();
+  private lastSync = performance.now();
 
   constructor(
     scene: THREE.Scene,
     physicsWorld: PhysicsWorld,
     color = 0x3366cc,
   ) {
-    this.mesh = new THREE.Group();
+    const character = createCharacterBody(color);
 
-    const capsuleGeo = new THREE.CapsuleGeometry(
-      PLAYER_RADIUS,
-      PLAYER_HALF_HEIGHT * 2,
-      8,
-      16,
-    );
-
-    this.material = new THREE.MeshStandardMaterial({
-      color,
-    });
-
-    this.visual = new THREE.Mesh(
-      capsuleGeo,
-      this.material,
-    );
-
-    this.visual.castShadow = true;
-
-    this.mesh.add(this.visual);
-    this.mesh.add(createCharacterFace());
-
-    this.weapon = createCharacterWeapon();
-    this.mesh.add(this.weapon);
+    this.mesh = character.group;
+    this.visual = character.body;
+    this.material = character.body.material as THREE.MeshStandardMaterial;
+    this.weapon = character.weapon;
+    this.animateCharacter = character.animate;
 
     scene.add(this.mesh);
 
@@ -120,6 +104,8 @@ export class Player {
     );
 
     this.mesh.position.set(x, y, z);
+    this.previousPosition.copy(this.mesh.position);
+    this.lastSync = performance.now();
     this.setFacingAngle(facing);
 
     this.health = MAX_HEALTH;
@@ -173,10 +159,23 @@ export class Player {
   syncMesh(): void {
     const t = this.body.translation();
 
-    this.mesh.position.set(
-      t.x,
-      t.y,
-      t.z,
+    const now = performance.now();
+    const delta = Math.min(
+      0.1,
+      Math.max(0.001, (now - this.lastSync) / 1000),
     );
+
+    this.lastSync = now;
+
+    this.mesh.position.set(t.x, t.y, t.z);
+
+    const distance = this.mesh.position.distanceTo(this.previousPosition);
+
+    this.animateCharacter(
+      delta,
+      this.isGrounded ? distance / delta : 0,
+    );
+
+    this.previousPosition.copy(this.mesh.position);
   }
 }

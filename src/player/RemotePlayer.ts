@@ -2,12 +2,9 @@
 import * as THREE from 'three';
 import {
   MAX_HEALTH,
-  PLAYER_HALF_HEIGHT,
-  PLAYER_RADIUS,
 } from '../../shared/combat.ts';
 import type { PlayerSnapshot } from '../../shared/protocol.ts';
-import { createCharacterFace } from './createCharacterFace.ts';
-import { createCharacterWeapon } from './createCharacterWeapon.ts';
+import { createCharacterBody } from './createCharacterBody.ts';
 
 export class RemotePlayer {
   readonly id: string;
@@ -24,6 +21,8 @@ export class RemotePlayer {
   private weapon: THREE.Group;
   private targetPos = new THREE.Vector3();
   private targetFacing = 0;
+  private readonly animateCharacter: (delta: number, speed: number) => void;
+  private previousPosition = new THREE.Vector3();
 
   constructor(
     scene: THREE.Scene,
@@ -36,27 +35,12 @@ export class RemotePlayer {
     this.alive = snapshot.alive;
     this.isBot = snapshot.isBot;
 
-    this.mesh = new THREE.Group();
+    const character = createCharacterBody(snapshot.color);
 
-    const geo = new THREE.CapsuleGeometry(
-      PLAYER_RADIUS,
-      PLAYER_HALF_HEIGHT * 2,
-      8,
-      16,
-    );
-
-    const mat = new THREE.MeshStandardMaterial({
-      color: snapshot.color,
-    });
-
-    this.visual = new THREE.Mesh(geo, mat);
-    this.visual.castShadow = true;
-
-    this.mesh.add(this.visual);
-    this.mesh.add(createCharacterFace());
-
-    this.weapon = createCharacterWeapon();
-    this.mesh.add(this.weapon);
+    this.mesh = character.group;
+    this.visual = character.body;
+    this.weapon = character.weapon;
+    this.animateCharacter = character.animate;
 
     this.label = createNameLabel(this.labelText());
     this.label.position.y = 1.4;
@@ -72,6 +56,7 @@ export class RemotePlayer {
     this.mesh.rotation.y = snapshot.facing;
 
     this.targetPos.copy(this.mesh.position);
+    this.previousPosition.copy(this.mesh.position);
     this.targetFacing = snapshot.facing;
 
     scene.add(this.mesh);
@@ -128,6 +113,13 @@ export class RemotePlayer {
     }
 
     this.mesh.rotation.y += angleDiff * t;
+
+    const speed = delta > 0
+      ? this.mesh.position.distanceTo(this.previousPosition) / delta
+      : 0;
+
+    this.animateCharacter(delta, speed);
+    this.previousPosition.copy(this.mesh.position);
   }
 
   get position(): THREE.Vector3 {

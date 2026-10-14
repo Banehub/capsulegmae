@@ -1,7 +1,7 @@
 
 import * as THREE from 'three';
 import { GROUND_SIZE } from '../../shared/arena.ts';
-import { FireEffect } from './FireEffect.ts';
+import { createMilitaryDetails } from './createMilitaryDetails.ts';
 
 export interface SceneContext {
   scene: THREE.Scene;
@@ -12,185 +12,189 @@ export interface SceneContext {
 export function createScene(container: HTMLElement): SceneContext {
   const scene = new THREE.Scene();
 
-  scene.background = new THREE.Color(0x121826);
-  scene.fog = new THREE.FogExp2(0x151d2c, 0.008);
+  const skyColor = 0xaebfc0;
+
+  scene.background = new THREE.Color(skyColor);
+  scene.fog = new THREE.FogExp2(skyColor, 0.0045);
 
   const camera = new THREE.PerspectiveCamera(
     60,
-    container.clientWidth / container.clientHeight,
+    Math.max(1, container.clientWidth) / Math.max(1, container.clientHeight),
     0.1,
-    200,
+    220,
   );
 
-  // The camera must belong to the scene so its
-  // attached first-person rifle can be rendered.
   scene.add(camera);
 
   const renderer = new THREE.WebGLRenderer({
     antialias: true,
+    powerPreference: 'high-performance',
   });
 
   renderer.setSize(
-    container.clientWidth,
-    container.clientHeight,
+    Math.max(1, container.clientWidth),
+    Math.max(1, container.clientHeight),
   );
 
-  renderer.setPixelRatio(
-    Math.min(window.devicePixelRatio, 2),
-  );
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.75;
+  renderer.toneMappingExposure = 1.08;
 
   container.appendChild(renderer.domElement);
 
-  const ambient = new THREE.HemisphereLight(
-    0x8a9ab8,
-    0x1a2030,
-    1.4,
+  const hemisphere = new THREE.HemisphereLight(
+    0xdce8ec,
+    0x77715c,
+    1.65,
+  );
+
+  scene.add(hemisphere);
+
+  const sun = new THREE.DirectionalLight(
+    0xffe1ac,
+    2.8,
+  );
+
+  sun.position.set(-32, 45, 25);
+  sun.castShadow = true;
+
+  sun.shadow.mapSize.set(2048, 2048);
+  sun.shadow.camera.near = 0.5;
+  sun.shadow.camera.far = 130;
+  sun.shadow.camera.left = -52;
+  sun.shadow.camera.right = 52;
+  sun.shadow.camera.top = 52;
+  sun.shadow.camera.bottom = -52;
+  sun.shadow.bias = -0.0003;
+  sun.shadow.normalBias = 0.03;
+
+  scene.add(sun);
+  scene.add(sun.target);
+
+  const fill = new THREE.DirectionalLight(
+    0xa6c2d5,
+    0.55,
+  );
+
+  fill.position.set(24, 16, -20);
+  scene.add(fill);
+
+  const ambient = new THREE.AmbientLight(
+    0xffffff,
+    0.16,
   );
 
   scene.add(ambient);
 
-  const moon = new THREE.DirectionalLight(
-    0xd8e4ff,
-    1.55,
+  const sky = new THREE.Mesh(
+    new THREE.SphereGeometry(190, 32, 20),
+    new THREE.MeshBasicMaterial({
+      color: 0xb6c8c9,
+      side: THREE.BackSide,
+      fog: false,
+      depthWrite: false,
+    }),
   );
 
-  moon.position.set(-12, 20, 8);
-  moon.castShadow = true;
-  moon.shadow.mapSize.set(2048, 2048);
-  moon.shadow.camera.near = 0.5;
-  moon.shadow.camera.far = 70;
-  moon.shadow.camera.left = -28;
-  moon.shadow.camera.right = 28;
-  moon.shadow.camera.top = 28;
-  moon.shadow.camera.bottom = -28;
-  moon.shadow.bias = -0.0004;
+  scene.add(sky);
 
-  scene.add(moon);
-
-  const fill = new THREE.DirectionalLight(
-    0xa8c0ff,
-    0.75,
+  const sunDisc = new THREE.Mesh(
+    new THREE.SphereGeometry(4.5, 16, 12),
+    new THREE.MeshBasicMaterial({
+      color: 0xffe8b3,
+      fog: false,
+      depthWrite: false,
+    }),
   );
 
-  fill.position.set(8, 12, -10);
-  scene.add(fill);
+  sunDisc.position.set(-105, 125, -90);
+  scene.add(sunDisc);
 
-  const top = new THREE.DirectionalLight(
-    0xffffff,
-    0.35,
+  const distantGround = new THREE.Mesh(
+    new THREE.PlaneGeometry(360, 360),
+    new THREE.MeshStandardMaterial({
+      color: 0x767e6b,
+      roughness: 1,
+    }),
   );
 
-  top.position.set(0, 25, 0);
-  scene.add(top);
+  distantGround.rotation.x = -Math.PI / 2;
+  distantGround.position.y = -0.4;
+  distantGround.receiveShadow = true;
+  scene.add(distantGround);
+
+  const distantMaterial = new THREE.MeshStandardMaterial({
+    color: 0x657168,
+    roughness: 0.95,
+  });
+
+  const structures = [
+    [-75, -72, 24, 12, 18],
+    [-42, -86, 19, 9, 14],
+    [10, -90, 35, 11, 17],
+    [70, -75, 27, 14, 20],
+    [-86, 8, 18, 9, 30],
+    [88, -8, 18, 12, 28],
+    [-74, 75, 34, 11, 18],
+    [64, 84, 30, 13, 20],
+  ];
+
+  for (const [x, z, width, height, depth] of structures) {
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(width, height, depth),
+      distantMaterial,
+    );
+
+    mesh.position.set(x, height / 2 - 0.35, z);
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+  }
 
   const half = GROUND_SIZE / 2;
 
-  const firePositions = [
-    new THREE.Vector3(
-      half - 2,
-      0,
-      -half + 2,
-    ),
-    new THREE.Vector3(
-      -half + 2,
-      0,
-      -half + 4,
-    ),
-    new THREE.Vector3(
-      half - 4,
-      0,
-      half - 3,
-    ),
-  ];
+  const outerRoadMaterial = new THREE.MeshStandardMaterial({
+    color: 0x555c56,
+    roughness: 0.97,
+  });
 
-  const fires: FireEffect[] = [];
-  const fireLights: THREE.PointLight[] = [];
-
-  for (const pos of firePositions) {
-    const fire = new FireEffect(
-      pos,
-      100,
-      1.2,
-      1,
+  for (const side of [-1, 1]) {
+    const roadX = new THREE.Mesh(
+      new THREE.PlaneGeometry(8, GROUND_SIZE + 48),
+      outerRoadMaterial,
     );
 
-    scene.add(fire.points);
-    fires.push(fire);
+    roadX.rotation.x = -Math.PI / 2;
+    roadX.position.set(side * (half + 17), -0.29, 0);
+    scene.add(roadX);
 
-    const light = new THREE.PointLight(
-      0xff6a2e,
-      38,
-      45,
-      2,
+    const roadZ = new THREE.Mesh(
+      new THREE.PlaneGeometry(GROUND_SIZE + 48, 8),
+      outerRoadMaterial,
     );
 
-    light.position.set(
-      pos.x,
-      2.5,
-      pos.z,
-    );
-
-    scene.add(light);
-    fireLights.push(light);
+    roadZ.rotation.x = -Math.PI / 2;
+    roadZ.position.set(0, -0.29, side * (half + 17));
+    scene.add(roadZ);
   }
 
-  const blueRim = new THREE.PointLight(
-    0x3f7bff,
-    28,
-    60,
-    2,
-  );
+  createMilitaryDetails(scene);
 
-  blueRim.position.set(
-    -half + 3,
-    6,
-    half - 3,
-  );
+  const resize = () => {
+    const width = Math.max(1, container.clientWidth);
+    const height = Math.max(1, container.clientHeight);
 
-  scene.add(blueRim);
-
-  const clock = new THREE.Clock();
-
-  renderer.setAnimationLoop(() => {
-    const delta = Math.min(
-      clock.getDelta(),
-      0.05,
-    );
-
-    const t = clock.elapsedTime;
-
-    for (const fire of fires) {
-      fire.update(delta);
-    }
-
-    for (
-      let i = 0;
-      i < fireLights.length;
-      i += 1
-    ) {
-      const flicker =
-        0.8 +
-        Math.sin(t * 12 + i) * 0.12 +
-        Math.sin(t * 27 + i) * 0.08;
-
-      fireLights[i]!.intensity = 38 * flicker;
-    }
-  });
-
-  window.addEventListener('resize', () => {
-    const w = container.clientWidth;
-    const h = container.clientHeight;
-
-    camera.aspect = w / h;
+    camera.aspect = width / height;
     camera.updateProjectionMatrix();
 
-    renderer.setSize(w, h);
-  });
+    renderer.setSize(width, height);
+  };
+
+  window.addEventListener('resize', resize);
 
   return {
     scene,

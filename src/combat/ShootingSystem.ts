@@ -1,4 +1,6 @@
+
 import * as THREE from 'three';
+import { createWeaponModel as buildWeaponModel } from './createWeaponModel.ts';
 import { PLAYER_EYE_HEIGHT } from '../../shared/combat.ts';
 import {
   WEAPONS,
@@ -222,204 +224,12 @@ export class ShootingSystem {
       });
     }
 
-    const metal = new THREE.MeshStandardMaterial({
-      color: 0x28313e,
-      metalness: 0.65,
-      roughness: 0.35,
-    });
-
-    const dark = new THREE.MeshStandardMaterial({
-      color: 0x111722,
-      metalness: 0.3,
-      roughness: 0.65,
-    });
-
-    const accent = new THREE.MeshStandardMaterial({
-      color: 0x258fe6,
-      metalness: 0.4,
-      roughness: 0.3,
-      emissive: 0x08253c,
-    });
-
-    const addBox = (
-      width: number,
-      height: number,
-      depth: number,
-      x: number,
-      y: number,
-      z: number,
-      material: THREE.Material,
-    ): THREE.Mesh => {
-      const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(width, height, depth),
-        material,
-      );
-
-      mesh.position.set(x, y, z);
-      mesh.castShadow = true;
-
-      this.weapon.add(mesh);
-
-      return mesh;
-    };
-
     const isPistol = this.weaponId === 'pistol';
     const isShotgun = this.weaponId === 'shotgun';
     const isSniper = this.weaponId === 'sniper';
 
-    const bodyLength = isPistol
-      ? 0.3
-      : isShotgun
-        ? 0.75
-        : isSniper
-          ? 0.85
-          : 0.65;
-
-    const barrelLength = isPistol
-      ? 0.22
-      : isShotgun
-        ? 0.65
-        : isSniper
-          ? 0.9
-          : 0.55;
-
-    const bodyHeight = isPistol ? 0.14 : 0.17;
-
-    addBox(
-      0.19,
-      bodyHeight,
-      bodyLength,
-      0,
-      0,
-      -0.1,
-      metal,
-    );
-
-    addBox(
-      0.14,
-      0.06,
-      bodyLength * 0.7,
-      0,
-      0.11,
-      -0.13,
-      accent,
-    );
-
-    if (!isPistol) {
-      addBox(
-        0.15,
-        0.12,
-        bodyLength * 0.6,
-        0,
-        -0.015,
-        -0.5,
-        dark,
-      );
-    }
-
-    const barrelCenter =
-      -0.1 - bodyLength / 2 - barrelLength / 2 + 0.08;
-
-    const barrel = new THREE.Mesh(
-      new THREE.CylinderGeometry(
-        isShotgun ? 0.055 : 0.035,
-        isShotgun ? 0.06 : 0.04,
-        barrelLength,
-        12,
-      ),
-      metal,
-    );
-
-    barrel.rotation.x = Math.PI / 2;
-    barrel.position.set(0, 0, barrelCenter);
-    barrel.castShadow = true;
-
-    this.weapon.add(barrel);
-
-    const muzzleZ = barrelCenter - barrelLength / 2;
-
-    addBox(
-      isShotgun ? 0.13 : 0.1,
-      isShotgun ? 0.13 : 0.1,
-      0.1,
-      0,
-      0,
-      muzzleZ,
-      dark,
-    );
-
-    const grip = addBox(
-      0.12,
-      0.28,
-      0.15,
-      0,
-      -0.22,
-      0.12,
-      dark,
-    );
-
-    grip.rotation.x = -0.2;
-
-    if (!isPistol) {
-      const magazine = addBox(
-        0.13,
-        isShotgun ? 0.12 : 0.32,
-        0.18,
-        0,
-        isShotgun ? -0.14 : -0.24,
-        -0.12,
-        dark,
-      );
-
-      magazine.rotation.x = -0.15;
-
-      addBox(
-        0.13,
-        0.14,
-        0.35,
-        0,
-        -0.015,
-        0.4,
-        metal,
-      );
-    }
-
-    if (isSniper) {
-      addBox(
-        0.15,
-        0.16,
-        0.42,
-        0,
-        0.25,
-        -0.15,
-        dark,
-      );
-
-      const lens = new THREE.Mesh(
-        new THREE.CylinderGeometry(
-          0.085,
-          0.085,
-          0.2,
-          16,
-        ),
-        accent,
-      );
-
-      lens.rotation.x = Math.PI / 2;
-      lens.position.set(0, 0.25, -0.4);
-
-      this.weapon.add(lens);
-    } else {
-      addBox(
-        0.08,
-        0.13,
-        0.08,
-        0,
-        0.2,
-        -0.2,
-        dark,
-      );
-    }
+    const { group: model, muzzleZ } = buildWeaponModel(this.weaponId);
+    this.weapon.add(model);
 
     const flashMaterial = new THREE.MeshBasicMaterial({
       color: 0xffcc33,
@@ -449,7 +259,6 @@ export class ShootingSystem {
 
     this.muzzleAnchor = new THREE.Object3D();
     this.muzzleAnchor.position.set(0, 0, muzzleZ - 0.08);
-
     this.weapon.add(this.muzzleAnchor);
 
     this.weapon.scale.setScalar(
