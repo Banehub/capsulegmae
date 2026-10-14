@@ -1,3 +1,5 @@
+import type { WeaponId } from './weapons.ts';
+
 export type RoomPhase = 'lobby' | 'playing' | 'ended';
 export type GameMode = 'pvp' | 'solo';
 export type BotDifficulty = 'easy' | 'normal' | 'hard';
@@ -20,6 +22,7 @@ export interface PlayerSnapshot {
   isHost: boolean;
   isBot: boolean;
   color: number;
+  weaponId: WeaponId;
 }
 
 export interface RoomSnapshot {
@@ -41,6 +44,14 @@ export interface MovementUpdate {
   facing: number;
 }
 
+export interface WeaponStateUpdate {
+  weaponId: WeaponId;
+  ammo: number;
+  reserve: number;
+  reloading: boolean;
+  reloadEndAt: number;
+}
+
 export interface ShotIntent {
   origin: Vec3;
   direction: Vec3;
@@ -51,6 +62,8 @@ export interface ShotEvent {
   origin: Vec3;
   direction: Vec3;
   hitPlayerId: string | null;
+  weaponId: WeaponId;
+  hitPlayerIds: string[];
 }
 
 export interface HealthUpdate {
@@ -80,21 +93,46 @@ export interface CreateSoloPayload {
 }
 
 export interface ClientToServerEvents {
-  'room:create': (payload: { name: string }, callback: (result: RoomResult) => void) => void;
-  'room:createSolo': (payload: CreateSoloPayload, callback: (result: RoomResult) => void) => void;
-  'room:join': (payload: { code: string; name: string }, callback: (result: RoomResult) => void) => void;
-  'room:start': (callback: (result: { ok: boolean; error?: string }) => void) => void;
-  'room:rematch': (callback: (result: { ok: boolean; error?: string }) => void) => void;
+  'room:create': (
+    payload: { name: string },
+    callback: (result: RoomResult) => void,
+  ) => void;
+
+  'room:createSolo': (
+    payload: CreateSoloPayload,
+    callback: (result: RoomResult) => void,
+  ) => void;
+
+  'room:join': (
+    payload: { code: string; name: string },
+    callback: (result: RoomResult) => void,
+  ) => void;
+
+  'room:start': (
+    callback: (result: { ok: boolean; error?: string }) => void,
+  ) => void;
+
+  'room:rematch': (
+    callback: (result: { ok: boolean; error?: string }) => void,
+  ) => void;
+
   'player:move': (payload: MovementUpdate) => void;
   'player:shoot': (payload: ShotIntent) => void;
+  'weapon:select': (weaponId: WeaponId) => void;
+  'weapon:reload': () => void;
 }
 
 export interface ServerToClientEvents {
   'room:state': (state: RoomSnapshot) => void;
   'players:update': (players: PlayerSnapshot[]) => void;
   'shot:fired': (shot: ShotEvent) => void;
+  'weapon:state': (state: WeaponStateUpdate) => void;
   'player:health': (update: HealthUpdate) => void;
-  'player:eliminated': (payload: { playerId: string; name: string }) => void;
+
+  'player:eliminated': (
+    payload: { playerId: string; name: string },
+  ) => void;
+
   'round:end': (payload: RoundEndEvent) => void;
   'room:error': (payload: { message: string }) => void;
 }
