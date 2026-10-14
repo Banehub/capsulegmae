@@ -1,3 +1,4 @@
+
 import * as THREE from 'three';
 import { PLAYER_EYE_HEIGHT } from '../../shared/combat.ts';
 import type { InputManager } from '../input/InputManager.ts';
@@ -9,7 +10,6 @@ const SHOULDER_OFFSET = 1;
 const MIN_PITCH = -1.45;
 const MAX_PITCH = 1.45;
 const MOUSE_SENSITIVITY = 0.003;
-const FOLLOW_SMOOTH = 0.12;
 const FREE_CAM_SPEED = 10;
 
 export type CameraMode = 'local' | 'free' | 'follow';
